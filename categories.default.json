@@ -1,0 +1,95 @@
+{
+  "fallbackCategory": "其他支出",
+  "fallbackByFlow": {
+    "expense": "其他支出",
+    "income": "其他收入",
+    "transfer": "其他转账"
+  },
+  "categories": [
+    {"label":"食品","flow":"expense","parent":"食品饮料","description":"正餐、外卖、食材、超市食品及一般餐饮","keywords":["餐厅","牛杂","寿司","饭店","餐饮","食堂","早餐","午餐","晚餐","快餐","小吃","面馆","汤面","拉面","肉燥饭","火锅","烧烤","外卖","美团外卖","饿了么","生鲜","菜场","盒马","全家","罗森"]},
+    {"label":"饮料","flow":"expense","parent":"食品饮料","description":"奶茶、咖啡、茶饮、果汁等饮品","keywords":["蜜雪冰城","奶茶","咖啡","茶饮","果汁","饮品","瑞幸","星巴克","喜茶","manner"]},
+    {"label":"水果零食","flow":"expense","parent":"食品饮料","description":"水果、零食、糕点和休闲食品","keywords":["水果","零食","糕点","蛋糕","面包","坚果","薯片","糖果","甜品"]},
+
+    {"label":"衣服","flow":"expense","parent":"服饰外貌","description":"服装、鞋帽和穿戴用品","keywords":["服装","衣服","鞋","袜","帽","优衣库","zara","服饰"]},
+    {"label":"饰品","flow":"expense","parent":"服饰外貌","description":"首饰、手表、箱包和配饰","keywords":["饰品","首饰","项链","戒指","手表","箱包","包包","配饰"]},
+    {"label":"化妆品","flow":"expense","parent":"服饰外貌","description":"化妆、护肤和香水用品","keywords":["化妆品","护肤","面膜","口红","香水","美妆"]},
+    {"label":"美容美发","flow":"expense","parent":"服饰外貌","description":"理发、美容、美甲等服务","keywords":["理发","美发","美容","美甲","造型","发廊"]},
+
+    {"label":"家居用品","flow":"expense","parent":"住宅家居","description":"家具、厨具、清洁和日用品","keywords":["家居","家具","厨具","清洁用品","日用品","宜家","名创优品"]},
+    {"label":"电子产品","flow":"expense","parent":"住宅家居","description":"手机、电脑、数码和家用电器","keywords":["电子产品","数码","电器","手机","电脑","平板","耳机","京东自营","苹果零售店"]},
+    {"label":"维修保养","flow":"expense","parent":"住宅家居","description":"住宅、家电及用品维修保养","keywords":["维修","修理","保养","开锁","换锁"]},
+    {"label":"家政服务","flow":"expense","parent":"住宅家居","description":"保洁、搬家及其他家政服务","keywords":["家政","保洁","搬家","清洗服务"]},
+    {"label":"水电煤气","flow":"expense","parent":"住宅家居","description":"水费、电费、燃气费","keywords":["水费","电费","燃气","煤气","水电"]},
+    {"label":"租金贷款","flow":"expense","parent":"住宅家居","description":"房租、宿舍费、房贷等居住支出","keywords":["房租","租金","宿舍费","房贷","住房贷款"]},
+
+    {"label":"公共交通","flow":"expense","parent":"交通出行","description":"公交、地铁和公共交通卡","keywords":["地铁","公交","公共交通","交通卡","乘车码","随申码"]},
+    {"label":"打车租车","flow":"expense","parent":"交通出行","description":"出租车、网约车和租车","keywords":["滴滴","高德打车","出租车","网约车","曹操出行","t3出行","租车"]},
+    {"label":"私家车费用","flow":"expense","parent":"交通出行","description":"加油、充电、停车、通行及车辆养护","keywords":["加油","石油","充电桩","停车","高速","etc","洗车","车辆保养","汽车维修"]},
+    {"label":"火车票","flow":"expense","parent":"交通出行","description":"火车、高铁和铁路客票","keywords":["铁路","12306","火车票","高铁","动车"]},
+    {"label":"飞机票","flow":"expense","parent":"交通出行","description":"机票和航空客运","keywords":["机票","航空","航班","机场"]},
+
+    {"label":"电话费","flow":"expense","parent":"交流通讯","description":"手机、固定电话通信费用","keywords":["话费","电话费","手机充值","中国移动","中国联通","中国电信"]},
+    {"label":"上网费","flow":"expense","parent":"交流通讯","description":"宽带、流量和网络服务费用","keywords":["宽带","上网费","流量包","网络费"]},
+    {"label":"快递费","flow":"expense","parent":"交流通讯","description":"快递、邮寄和配送费用","keywords":["快递","邮费","邮政","顺丰","丰巢","菜鸟裹裹"]},
+
+    {"label":"运动健身","flow":"expense","parent":"休闲娱乐","description":"健身、运动场馆和体育活动","keywords":["健身","球馆","游泳","瑜伽","运动","体育馆"]},
+    {"label":"聚会支出","flow":"expense","parent":"休闲娱乐","description":"聚会、团体活动和共同娱乐支出","keywords":["聚会","团建","轰趴","aa收款"]},
+    {"label":"电影演出","flow":"expense","parent":"休闲娱乐","description":"电影、戏剧、音乐会和演出","keywords":["电影","影院","演出","剧院","音乐会","票务"]},
+    {"label":"玩具游戏","flow":"expense","parent":"休闲娱乐","description":"玩具、电子游戏和桌游","keywords":["玩具","游戏","steam","桌游","主机"]},
+    {"label":"会员订阅","flow":"expense","parent":"休闲娱乐","description":"视频、音乐、软件等会员订阅","keywords":["会员","订阅","续费","视频网站","网盘会员","音乐会员"]},
+    {"label":"宠物花费","flow":"expense","parent":"休闲娱乐","description":"宠物食品、用品和医疗服务","keywords":["宠物","猫粮","狗粮","宠物医院","兽医"]},
+    {"label":"旅游度假","flow":"expense","parent":"休闲娱乐","description":"酒店、景点、度假和旅游服务","keywords":["旅游","度假","酒店","宾馆","民宿","住宿","景区","门票","携程"]},
+
+    {"label":"书报杂志","flow":"expense","parent":"教育学习","description":"书籍、报刊、教材和学习资料","keywords":["书店","图书","书籍","教材","杂志","报刊","文具"]},
+    {"label":"培训课程","flow":"expense","parent":"教育学习","description":"培训、课程和教育服务","keywords":["课程","培训","学费","教育","网课"]},
+    {"label":"认证考试","flow":"expense","parent":"教育学习","description":"考试、证书和资格认证","keywords":["考试","报名费","认证","证书","考务"]},
+    {"label":"AI工具","flow":"expense","parent":"教育学习","description":"人工智能相关工具和平台","keywords":["codex","Codex"]},
+
+
+    {"label":"礼物","flow":"expense","parent":"礼物捐赠","description":"赠送礼品、礼金和红包","keywords":["礼物","礼品","礼金","红包","随礼"]},
+    {"label":"捐赠","flow":"expense","parent":"礼物捐赠","description":"慈善和公益捐赠","keywords":["捐赠","慈善","公益","募捐"]},
+
+    {"label":"检查治疗","flow":"expense","parent":"医疗健康","description":"医院、门诊、挂号、体检和治疗","keywords":["医院","门诊","挂号","体检","治疗","诊所","医疗"]},
+    {"label":"药品","flow":"expense","parent":"医疗健康","description":"药店和药品购买","keywords":["药房","药店","医药","药品","买药"]},
+    {"label":"医疗器械","flow":"expense","parent":"医疗健康","description":"医疗设备、器械和辅助用品","keywords":["医疗器械","器械","血压计","轮椅","助听器"]},
+
+    {"label":"税费支出","flow":"expense","parent":"金融保险","description":"税款和政府规费","keywords":["税费","税款","个税","契税","印花税"]},
+    {"label":"手续费","flow":"expense","parent":"金融保险","description":"银行、支付和金融服务手续费","keywords":["手续费","服务费","银行费用"]},
+    {"label":"保险支出","flow":"expense","parent":"金融保险","description":"各类保险保费","keywords":["保险","保费","车险","医保"]},
+    {"label":"利息支出","flow":"expense","parent":"金融保险","description":"贷款和信用产生的利息支出","keywords":["利息支出","贷款利息","信用卡利息"]},
+    {"label":"赔偿罚款","flow":"expense","parent":"金融保险","description":"赔偿、罚款和违约金","keywords":["赔偿","罚款","违约金","滞纳金"]},
+    {"label":"其他支出","flow":"expense","parent":"其他杂项","description":"无法归入其他支出二级分类的交易","keywords":[]},
+
+    {"label":"工资收入","flow":"income","parent":"职业收入","description":"工资和固定薪资收入","keywords":["工资","薪资","薪酬","发薪"]},
+    {"label":"奖金收入","flow":"income","parent":"职业收入","description":"奖金和绩效奖励","keywords":["奖金","绩效","年终奖"]},
+    {"label":"加班收入","flow":"income","parent":"职业收入","description":"加班工资和补贴","keywords":["加班费","加班工资"]},
+    {"label":"兼职收入","flow":"income","parent":"职业收入","description":"兼职和劳务报酬","keywords":["兼职","劳务","稿费","报酬"]},
+    {"label":"生活费","flow":"income","parent":"职业收入","description":"家庭提供的生活费","keywords":["生活费"]},
+    {"label":"投资收入","flow":"income","parent":"金融投资","description":"证券、基金和其他投资收益","keywords":["投资收入","投资收益","分红","基金赎回","证券"]},
+    {"label":"租金收入","flow":"income","parent":"金融投资","description":"出租资产取得的租金","keywords":["租金收入","房租收入","出租收入"]},
+    {"label":"利息收入","flow":"income","parent":"金融投资","description":"存款和理财利息","keywords":["利息收入","结息","存款利息"]},
+    {"label":"礼品红包","flow":"income","parent":"其他杂项","description":"收到的礼品、礼金和红包","keywords":["收到红包","礼品红包","礼金收入"]},
+    {"label":"中奖收入","flow":"income","parent":"其他杂项","description":"彩票、抽奖和竞赛中奖","keywords":["中奖","彩票","抽奖奖金"]},
+    {"label":"意外收入","flow":"income","parent":"其他杂项","description":"偶发且非计划收入","keywords":["意外收入"]},
+    {"label":"其他收入","flow":"income","parent":"其他杂项","description":"无法归入其他收入二级分类的交易","keywords":[]},
+    {"label":"退款","flow":"income","parent":"其他杂项","description":"消费、退货或服务退款","keywords":["退款","退货"]},
+
+    {"label":"银行转账","flow":"transfer","parent":"一般转账","description":"银行账户之间的普通转账","keywords":["银行转账","银行卡转账","账户转账"]},
+    {"label":"信用卡还款","flow":"transfer","parent":"一般转账","description":"信用卡账单还款","keywords":["信用卡还款","还信用卡"]},
+    {"label":"存款取款","flow":"transfer","parent":"一般转账","description":"现金存取、充值和提现","keywords":["存款","取款","提现","充值","零钱提现"]},
+    {"label":"借入","flow":"transfer","parent":"贷款债务","description":"借入资金","keywords":["借入","借款到账"]},
+    {"label":"借出","flow":"transfer","parent":"贷款债务","description":"借出资金","keywords":["借出","借给"]},
+    {"label":"还款","flow":"transfer","parent":"贷款债务","description":"偿还借款或贷款本金","keywords":["还款","偿还借款"]},
+    {"label":"收债","flow":"transfer","parent":"贷款债务","description":"收回借出资金","keywords":["收债","收回借款"]},
+    {"label":"垫付支出","flow":"transfer","parent":"其他杂项","description":"替他人或团体垫付资金","keywords":["垫付","代付"]},
+    {"label":"报销","flow":"transfer","parent":"其他杂项","description":"收到垫付款或费用报销","keywords":["报销","费用报销"]},
+    {"label":"其他转账","flow":"transfer","parent":"其他杂项","description":"无法归入其他转账二级分类的资金移动","keywords":[]}
+  ],
+  "merchantRules": [
+    {"contains":"蜜雪冰城","category":"饮料","confidence":0.99},
+    {"contains":"台南肉燥饭","category":"食品","confidence":0.99},
+    {"contains":"潮汕汤面","category":"食品","confidence":0.99},
+    {"contains":"manner","category":"饮料","confidence":0.88},
+    {"contains":"🏐","category":"运动健身","confidence":0.85}
+  ]
+}

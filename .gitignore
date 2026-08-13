@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Bills and generated workbooks
+*.xlsx
+*.xls
+*.csv
+*.tsv
+outputs/
+
+# JavaScript / Node and local test artifacts
+*.mjs
+node_modules/
+test/
+
+# Local wrappers not included in the Python-only repository
+run.cmd
+run.ps1
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
