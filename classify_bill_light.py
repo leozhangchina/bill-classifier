@@ -60,8 +60,6 @@ EXTRA_KEYWORDS = {
     "运动健身": ["体育系", "体育场", "场地费"],
     "会员订阅": ["连续包月", "自动续费"],
     "利息收入": ["收益发放", "余额宝收益"],
-    "信用卡还款": ["花呗还款", "花呗主动还款"],
-    "存款取款": ["转入零钱通", "转出零钱通", "转入余额宝", "余额宝转入", "转账收款到余额宝"],
 }
 
 # 支付宝“交易分类”可作为辅助证据，但不会覆盖更具体的商品关键词。
@@ -69,8 +67,7 @@ SOURCE_CATEGORY_HINTS = {
     "餐饮美食": "食品",
     "日用百货": "家居用品",
     "爱车养车": "私家车费用",
-    "信用借还": "信用卡还款",
-    "转账红包": "其他转账",
+    "信用借还": "其他支出",
 }
 
 
@@ -306,25 +303,33 @@ def transaction_text(transaction: dict[str, Any]) -> str:
 
 
 def transaction_flow(transaction: dict[str, Any]) -> str:
+    """轻量版只区分收入和支出，不使用转账分类组。"""
     text = transaction_text(transaction)
     if "退款" in text or "退货" in text:
         return "income"
     if any(marker in text for marker in ("收益发放", "利息收入", "结息", "存款利息")):
         return "income"
-    transfer_markers = (
-        "信用卡还款", "花呗还款", "花呗主动还款", "银行转账", "银行卡转账",
-        "账户转账", "转入零钱通", "转出零钱通", "零钱提现", "微信提现",
-        "转入余额宝", "余额宝转入", "转账收款到余额宝", "存款", "取款",
-        "借入", "借出", "偿还借款", "收回借款", "收债", "垫付", "报销",
-    )
-    if any(marker in text for marker in transfer_markers):
-        return "transfer"
-    transaction_type = normalize_text(transaction.get("type"))
-    if "转账" in transaction_type or "还款" in transaction_type:
-        return "transfer"
+
+    # 账单原始方向最可靠；“不计收支”或空值再根据交易语义推断。
     direction = normalize_text(transaction.get("direction"))
     if "收入" in direction or direction in {"收", "+"}:
         return "income"
+    if "支出" in direction or direction in {"支", "-"}:
+        return "expense"
+
+    income_markers = (
+        "转入", "收款", "借入", "收回借款", "收债", "报销", "存入", "存款", "到账",
+    )
+    if any(marker in text for marker in income_markers):
+        return "income"
+
+    expense_markers = (
+        "转出", "付款", "还款", "借出", "偿还借款", "垫付", "提现", "取款", "充值",
+    )
+    if any(marker in text for marker in expense_markers):
+        return "expense"
+
+    # 没有明确方向的普通转账按支出给出候选，并以低置信度要求人工复核。
     return "expense"
 
 

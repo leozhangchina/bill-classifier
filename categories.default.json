@@ -15,14 +15,14 @@
     {"label":"化妆品","flow":"expense","parent":"服饰外貌","description":"化妆、护肤和香水用品","keywords":["化妆品","护肤","面膜","口红","香水","美妆"]},
     {"label":"美容美发","flow":"expense","parent":"服饰外貌","description":"理发、美容、美甲等服务","keywords":["理发","美发","美容","美甲","造型","发廊"]},
 
-    {"label":"家居用品","flow":"expense","parent":"住宅家居","description":"家具、厨具、清洁和日用品","keywords":["家居","家具","厨具","清洁用品","日用品","宜家","名创优品"]},
+    {"label":"家居用品","flow":"expense","parent":"住宅家居","description":"家具、厨具、清洁和日用品","keywords":["家居","家具","厨具","清洁用品","日用品","宜家","名创优品","洗衣机"]},
     {"label":"电子产品","flow":"expense","parent":"住宅家居","description":"手机、电脑、数码和家用电器","keywords":["电子产品","数码","电器","手机","电脑","平板","耳机","京东自营","苹果零售店"]},
     {"label":"维修保养","flow":"expense","parent":"住宅家居","description":"住宅、家电及用品维修保养","keywords":["维修","修理","保养","开锁","换锁"]},
-    {"label":"家政服务","flow":"expense","parent":"住宅家居","description":"保洁、搬家及其他家政服务","keywords":["家政","保洁","搬家","清洗服务"]},
+    {"label":"家政服务","flow":"expense","parent":"住宅家居","description":"保洁、搬家及其他家政服务","keywords":["家政","保洁","搬家","清洗服务","加强洗"]},
     {"label":"水电煤气","flow":"expense","parent":"住宅家居","description":"水费、电费、燃气费","keywords":["水费","电费","燃气","煤气","水电"]},
     {"label":"租金贷款","flow":"expense","parent":"住宅家居","description":"房租、宿舍费、房贷等居住支出","keywords":["房租","租金","宿舍费","房贷","住房贷款"]},
 
-    {"label":"公共交通","flow":"expense","parent":"交通出行","description":"公交、地铁和公共交通卡","keywords":["地铁","公交","公共交通","交通卡","乘车码","随申码"]},
+    {"label":"公共交通","flow":"expense","parent":"交通出行","description":"公交、地铁和公共交通卡","keywords":["地铁","公交","公共交通","交通卡","乘车码","随申码","班车","沪BD5227"]},
     {"label":"打车租车","flow":"expense","parent":"交通出行","description":"出租车、网约车和租车","keywords":["滴滴","高德打车","出租车","网约车","曹操出行","t3出行","租车"]},
     {"label":"私家车费用","flow":"expense","parent":"交通出行","description":"加油、充电、停车、通行及车辆养护","keywords":["加油","石油","充电桩","停车","高速","etc","洗车","车辆保养","汽车维修"]},
     {"label":"火车票","flow":"expense","parent":"交通出行","description":"火车、高铁和铁路客票","keywords":["铁路","12306","火车票","高铁","动车"]},
