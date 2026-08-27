@@ -6,7 +6,7 @@
     "transfer": "其他转账"
   },
   "categories": [
-    {"label":"食品","flow":"expense","parent":"食品饮料","description":"正餐、外卖、食材、超市食品及一般餐饮","keywords":["餐厅","牛杂","寿司","饭店","餐饮","食堂","早餐","午餐","晚餐","快餐","小吃","面馆","汤面","拉面","肉燥饭","火锅","烧烤","外卖","美团外卖","饿了么","生鲜","菜场","盒马","全家","罗森"]},
+    {"label":"食品","flow":"expense","parent":"食品饮料","description":"正餐、外卖、食材、超市食品及一般餐饮","keywords":["金拱门","油边王","滑蛋饭","料理","重庆小面","餐厅","牛杂","寿司","饭店","餐饮","食堂","早餐","午餐","晚餐","快餐","小吃","面馆","汤面","拉面","肉燥饭","火锅","烧烤","外卖","美团外卖","饿了么","生鲜","菜场","盒马","全家","罗森"]},
     {"label":"饮料","flow":"expense","parent":"食品饮料","description":"奶茶、咖啡、茶饮、果汁等饮品","keywords":["蜜雪冰城","奶茶","咖啡","茶饮","果汁","饮品","瑞幸","星巴克","喜茶","manner"]},
     {"label":"水果零食","flow":"expense","parent":"食品饮料","description":"水果、零食、糕点和休闲食品","keywords":["水果","零食","糕点","蛋糕","面包","坚果","薯片","糖果","甜品"]},
 
@@ -24,7 +24,7 @@
 
     {"label":"公共交通","flow":"expense","parent":"交通出行","description":"公交、地铁和公共交通卡","keywords":["地铁","公交","公共交通","交通卡","乘车码","随申码","班车","沪BD5227"]},
     {"label":"打车租车","flow":"expense","parent":"交通出行","description":"出租车、网约车和租车","keywords":["滴滴","高德打车","出租车","网约车","曹操出行","t3出行","租车"]},
-    {"label":"私家车费用","flow":"expense","parent":"交通出行","description":"加油、充电、停车、通行及车辆养护","keywords":["加油","石油","充电桩","停车","高速","etc","洗车","车辆保养","汽车维修"]},
+    {"label":"私家车费用","flow":"expense","parent":"交通出行","description":"加油、充电、停车、通行及车辆养护","keywords":["沪AE32109","加油","石油","充电桩","停车","高速","etc","洗车","车辆保养","汽车维修"]},
     {"label":"火车票","flow":"expense","parent":"交通出行","description":"火车、高铁和铁路客票","keywords":["铁路","12306","火车票","高铁","动车"]},
     {"label":"飞机票","flow":"expense","parent":"交通出行","description":"机票和航空客运","keywords":["机票","航空","航班","机场"]},
 
@@ -32,10 +32,10 @@
     {"label":"上网费","flow":"expense","parent":"交流通讯","description":"宽带、流量和网络服务费用","keywords":["宽带","上网费","流量包","网络费"]},
     {"label":"快递费","flow":"expense","parent":"交流通讯","description":"快递、邮寄和配送费用","keywords":["快递","邮费","邮政","顺丰","丰巢","菜鸟裹裹"]},
 
-    {"label":"运动健身","flow":"expense","parent":"休闲娱乐","description":"健身、运动场馆和体育活动","keywords":["健身","球馆","游泳","瑜伽","运动","体育馆"]},
+    {"label":"运动健身","flow":"expense","parent":"休闲娱乐","description":"健身、运动场馆和体育活动","keywords":["超羽","健身","球馆","游泳","瑜伽","运动","体育馆"]},
     {"label":"聚会支出","flow":"expense","parent":"休闲娱乐","description":"聚会、团体活动和共同娱乐支出","keywords":["聚会","团建","轰趴","aa收款"]},
     {"label":"电影演出","flow":"expense","parent":"休闲娱乐","description":"电影、戏剧、音乐会和演出","keywords":["电影","影院","演出","剧院","音乐会","票务"]},
-    {"label":"玩具游戏","flow":"expense","parent":"休闲娱乐","description":"玩具、电子游戏和桌游","keywords":["玩具","游戏","steam","桌游","主机"]},
+    {"label":"玩具游戏","flow":"expense","parent":"休闲娱乐","description":"玩具、电子游戏和桌游","keywords":["拼豆","玩具","游戏","steam","桌游","主机"]},
     {"label":"会员订阅","flow":"expense","parent":"休闲娱乐","description":"视频、音乐、软件等会员订阅","keywords":["会员","订阅","续费","视频网站","网盘会员","音乐会员"]},
     {"label":"宠物花费","flow":"expense","parent":"休闲娱乐","description":"宠物食品、用品和医疗服务","keywords":["宠物","猫粮","狗粮","宠物医院","兽医"]},
     {"label":"旅游度假","flow":"expense","parent":"休闲娱乐","description":"酒店、景点、度假和旅游服务","keywords":["旅游","度假","酒店","宾馆","民宿","住宿","景区","门票","携程"]},
@@ -90,6 +90,8 @@
     {"contains":"台南肉燥饭","category":"食品","confidence":0.99},
     {"contains":"潮汕汤面","category":"食品","confidence":0.99},
     {"contains":"manner","category":"饮料","confidence":0.88},
-    {"contains":"🏐","category":"运动健身","confidence":0.85}
+    {"contains":"🏐","category":"运动健身","confidence":0.85},
+    {"contains":"codex","category":"AI工具","confidence":0.99},
+    {"contains":"江西小炒","category":"食品","confidence":0.99}
   ]
 }

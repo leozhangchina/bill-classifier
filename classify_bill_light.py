@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""微信/支付宝账单轻量分类器：本地规则分类，无大模型、无交互确认。"""
+"""微信、支付宝和招商银行账单轻量分类器：本地规则分类，无大模型、无交互确认。"""
 
 from __future__ import annotations
 
@@ -32,21 +32,28 @@ DEFAULT_CATEGORIES = SCRIPT_DIR / "categories.default.json"
 DEFAULT_OVERRIDES = SCRIPT_DIR / "merchant-overrides.json"
 APPENDED_HEADERS = ["最终分类", "是否需要人工确认"]
 
-# 微信和支付宝采用不同列名，这里统一为程序内部字段。
+# 不同账单采用不同列名，这里统一为程序内部字段。
 HEADER_ALIASES = {
-    "time": ["交易时间", "时间", "支付时间", "记账时间"],
-    "type": ["交易类型", "交易分类", "类型"],
+    "time": ["交易时间", "时间", "支付时间", "记账时间", "记账日期"],
+    "type": ["交易类型", "交易分类", "交易摘要", "类型"],
     "counterparty": ["交易对方", "商户名称", "对方", "收款方"],
-    "account": ["对方账号", "交易对方账号"],
-    "product": ["商品", "商品说明", "商品名称", "摘要", "交易说明"],
+    "account": ["对方账号", "交易对方账号", "对手信息"],
+    "product": ["商品", "商品说明", "商品名称", "客户摘要", "摘要", "交易说明"],
     "direction": ["收/支", "收支", "交易方向"],
     "amount": ["金额(元)", "金额（元）", "金额", "交易金额"],
+    "balance": ["联机余额", "账户余额", "余额"],
+    "currency": ["货币", "币种"],
     "payment": ["支付方式", "付款方式", "收/付款方式", "收付款方式"],
     "status": ["当前状态", "交易状态", "状态"],
     "transaction_id": ["交易单号", "交易订单号", "交易号", "订单号"],
     "merchant_id": ["商户单号", "商家订单号", "商家订单号"],
     "remark": ["备注", "附言", "说明"],
 }
+
+CMB_PDF_HEADERS = [
+    "记账日期", "货币", "交易金额", "联机余额", "交易摘要",
+    "对手信息", "客户摘要", "交易对方", "收/支",
+]
 
 # 对两个样本中常见、但通用分类表尚未覆盖的表达做少量补充。
 # 用户仍可直接编辑 categories.default.json 的 keywords 动态扩充规则。
@@ -140,7 +147,7 @@ def find_header_row(rows: list[list[Any]]) -> int:
         default=(-1, -1),
     )
     if score < 6:
-        raise ValueError(f"无法识别微信/支付宝账单表头（最多匹配 {score} 个字段）")
+        raise ValueError(f"无法识别账单表头（最多匹配 {score} 个字段）")
     return index
 
 
@@ -153,7 +160,106 @@ def decode_csv(raw: bytes) -> str:
     raise ValueError("无法识别 CSV 编码")
 
 
+def join_pdf_words(words: list[dict[str, Any]]) -> str:
+    """按 PDF 中的纵向位置拼接同一单元格里被折行的文字。"""
+    lines: list[list[dict[str, Any]]] = []
+    for word in sorted(words, key=lambda item: (item["top"], item["x0"])):
+        if not lines or abs(word["top"] - lines[-1][0]["top"]) > 1.5:
+            lines.append([word])
+        else:
+            lines[-1].append(word)
+
+    text = ""
+    for line_words in lines:
+        line = " ".join(str(word["text"]) for word in sorted(line_words, key=lambda item: item["x0"]))
+        if not text:
+            text = line
+        elif text.endswith("-"):
+            text += line
+        elif re.search(r"[A-Za-z0-9]$", text) and re.match(r"[A-Za-z0-9]", line):
+            text += " " + line
+        elif re.search(r"[\u4e00-\u9fff）)]$", text) and re.match(r"\d", line):
+            text += " " + line
+        else:
+            text += line
+    text = text.replace("－", "-").replace("–", "-").replace("—", "-")
+    return re.sub(r"\s*-\s*", "-", text).strip()
+
+
+def cmb_counterparty(customer_summary: str, counter_info: str) -> str:
+    """招商银行客户摘要最后一个连字符后的内容是原交易对方。"""
+    if "-" in customer_summary:
+        candidate = customer_summary.rsplit("-", 1)[-1].strip()
+        if candidate:
+            return candidate
+    return re.sub(r"\s+\d[\d*]*$", "", counter_info).strip()
+
+
+def read_cmb_pdf_rows(path: Path) -> list[list[Any]]:
+    try:
+        import pdfplumber
+    except ImportError as exc:
+        raise ValueError("读取招商银行 PDF 需要 pdfplumber，请运行：python -m pip install pdfplumber") from exc
+
+    rows: list[list[Any]] = []
+    with pdfplumber.open(path) as pdf:
+        first_text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        if "招商银行交易流水" not in first_text:
+            raise ValueError("目前仅支持带文字层的招商银行交易流水 PDF")
+
+        for page in pdf.pages:
+            words = page.extract_words(x_tolerance=1, y_tolerance=3, keep_blank_chars=False)
+            anchors = sorted(
+                (
+                    word for word in words
+                    if word["x0"] < 80 and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(word["text"]))
+                ),
+                key=lambda item: item["top"],
+            )
+            if not anchors:
+                continue
+
+            boundaries = [anchors[0]["top"] - 18]
+            boundaries.extend((left["top"] + right["top"]) / 2 for left, right in zip(anchors, anchors[1:]))
+            boundaries.append(anchors[-1]["top"] + 18)
+
+            for index, anchor in enumerate(anchors):
+                row_words = [
+                    word for word in words
+                    if boundaries[index] <= word["top"] < boundaries[index + 1]
+                ]
+                columns = [
+                    join_pdf_words([word for word in row_words if lower <= word["x0"] < upper])
+                    for lower, upper in (
+                        (0, 80), (80, 130), (130, 205), (205, 285),
+                        (285, 370), (370, 475), (475, page.width + 1),
+                    )
+                ]
+                date_text, currency, amount_text, balance_text, summary, counter_info, customer_summary = columns
+                if date_text != str(anchor["text"]) or not currency:
+                    raise ValueError(f"招商银行 PDF 第 {page.page_number} 页存在无法识别的交易行")
+
+                signed_amount = parse_amount(amount_text)
+                balance = parse_amount(balance_text)
+                if not isinstance(signed_amount, (int, float)) or not isinstance(balance, (int, float)):
+                    raise ValueError(f"招商银行 PDF 第 {page.page_number} 页金额或余额无法识别")
+                direction = "收入" if signed_amount > 0 else "支出" if signed_amount < 0 else "不计收支"
+                amount = abs(signed_amount)
+                rows.append([
+                    datetime.strptime(date_text, "%Y-%m-%d"), currency, amount, balance,
+                    summary, counter_info, customer_summary,
+                    cmb_counterparty(customer_summary, counter_info), direction,
+                ])
+
+    if not rows:
+        raise ValueError("招商银行 PDF 中没有识别到交易记录")
+    return rows
+
+
 def read_rows(path: Path, requested_sheet: str | None) -> tuple[list[list[Any]], str]:
+    if path.suffix.lower() == ".pdf":
+        return [CMB_PDF_HEADERS, *read_cmb_pdf_rows(path)], "交易流水"
+
     if path.suffix.lower() == ".xlsx":
         workbook = load_workbook(path, read_only=True, data_only=True)
         try:
@@ -183,7 +289,7 @@ def read_rows(path: Path, requested_sheet: str | None) -> tuple[list[list[Any]],
                 pass
         return [list(row) for row in csv.reader(text.splitlines(), delimiter=delimiter)], "账单"
 
-    raise ValueError("仅支持 .xlsx、.csv 或 .tsv")
+    raise ValueError("仅支持 .xlsx、.csv、.tsv 或招商银行交易流水 .pdf")
 
 
 def parse_datetime(value: Any) -> Any:
@@ -200,7 +306,9 @@ def parse_datetime(value: Any) -> Any:
 def parse_amount(value: Any) -> Any:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return value
-    match = re.search(r"-?\d+(?:\.\d+)?", normalize_text(value).replace(",", "").replace("¥", "").replace("￥", ""))
+    cleaned = normalize_text(value).replace(",", "").replace("¥", "").replace("￥", "")
+    cleaned = cleaned.replace("−", "-").replace("–", "-").replace("—", "-")
+    match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
     return float(match.group(0)) if match else value
 
 
@@ -212,7 +320,11 @@ def clean_source(path: Path, requested_sheet: str | None) -> SourceData:
         header_values.pop()
     headers = [str(value).strip() if normalize_text(value) else f"未命名列{index + 1}" for index, value in enumerate(header_values)]
     lookup = header_lookup(headers)
-    provider = "支付宝" if "支付宝" in path.name or "交易分类" in headers else "微信"
+    provider = (
+        "招商银行" if path.suffix.lower() == ".pdf"
+        else "支付宝" if "支付宝" in path.name or "交易分类" in headers
+        else "微信"
+    )
     rows: list[list[Any]] = []
     for raw in raw_rows[header_index + 1:]:
         row = list(raw[:len(headers)]) + [None] * max(0, len(headers) - len(raw))
@@ -225,6 +337,8 @@ def clean_source(path: Path, requested_sheet: str | None) -> SourceData:
             row[lookup["time"]] = parse_datetime(row[lookup["time"]])
         if lookup["amount"] >= 0:
             row[lookup["amount"]] = parse_amount(row[lookup["amount"]])
+        if lookup["balance"] >= 0:
+            row[lookup["balance"]] = parse_amount(row[lookup["balance"]])
         # 支付宝原始账单把余额宝每日收益标成“不计收支”，但它实际增加资产，
         # 因此在输出清洗后的表格时统一修正为“收入”。
         product_text = normalize_text(row[lookup["product"]]) if lookup["product"] >= 0 else ""
@@ -426,27 +540,40 @@ def build_workbook(source: SourceData, results: list[Result], threshold: float) 
             cell.font = body_font
             cell.alignment = Alignment(vertical="center")
             cell.border = bottom_border
-        sheet.row_dimensions[row[0].row].height = 26
+        sheet.row_dimensions[row[0].row].height = 38 if source.provider == "招商银行" else 26
     for index in id_indexes:
         for row in range(2, sheet.max_row + 1):
             sheet.cell(row, index + 1).number_format = "@"
     if source.lookup["time"] >= 0:
         for row in range(2, sheet.max_row + 1):
-            sheet.cell(row, source.lookup["time"] + 1).number_format = "yyyy-mm-dd hh:mm:ss"
+            sheet.cell(row, source.lookup["time"] + 1).number_format = (
+                "yyyy-mm-dd" if source.provider == "招商银行" else "yyyy-mm-dd hh:mm:ss"
+            )
     if source.lookup["amount"] >= 0:
         for row in range(2, sheet.max_row + 1):
             cell = sheet.cell(row, source.lookup["amount"] + 1)
             cell.number_format = "#,##0.00"
             cell.alignment = Alignment(horizontal="right", vertical="center")
+    if source.lookup["balance"] >= 0:
+        for row in range(2, sheet.max_row + 1):
+            cell = sheet.cell(row, source.lookup["balance"] + 1)
+            cell.number_format = "#,##0.00"
+            cell.alignment = Alignment(horizontal="right", vertical="center")
 
     default_widths = {
-        "time": 22, "type": 16, "counterparty": 27, "account": 24, "product": 35,
+        "time": 16, "type": 16, "counterparty": 27, "account": 32, "product": 35,
         "direction": 11, "amount": 12, "payment": 16, "status": 16,
-        "transaction_id": 34, "merchant_id": 34, "remark": 20,
+        "transaction_id": 34, "merchant_id": 34, "remark": 20, "balance": 14, "currency": 10,
     }
     for key, index in source.lookup.items():
         if index >= 0:
             sheet.column_dimensions[excel_column(index + 1)].width = default_widths.get(key, 16)
+    if source.provider == "招商银行":
+        for key in ("account", "product", "counterparty"):
+            index = source.lookup[key]
+            if index >= 0:
+                for row in range(2, sheet.max_row + 1):
+                    sheet.cell(row, index + 1).alignment = Alignment(vertical="center", wrap_text=True)
     sheet.column_dimensions[excel_column(source_count + 1)].width = 18
     sheet.column_dimensions[excel_column(source_count + 2)].width = 20
     for row in range(2, sheet.max_row + 1):
@@ -483,8 +610,8 @@ def verify_output(path: Path, source: SourceData, labels: set[str]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="微信/支付宝账单轻量分类器（无大模型、无交互）")
-    parser.add_argument("input", type=Path, help="微信 .xlsx 或支付宝 .csv 文件")
+    parser = argparse.ArgumentParser(description="微信、支付宝和招商银行账单轻量分类器（无大模型、无交互）")
+    parser.add_argument("input", type=Path, help="微信 .xlsx、支付宝 .csv 或招商银行交易流水 .pdf 文件")
     parser.add_argument("--output", type=Path, help="输出 .xlsx 路径")
     parser.add_argument("--categories", type=Path, default=DEFAULT_CATEGORIES, help="分类配置 JSON")
     parser.add_argument("--overrides", type=Path, default=DEFAULT_OVERRIDES, help="商户覆盖规则 JSON")
@@ -512,10 +639,12 @@ def main() -> int:
     workbook.close()
     verify_output(output_path, source, set(config.labels))
     pending = sum(result.confidence < args.threshold for result in results)
-    print(
-        f"完成：{output_path}\n来源：{source.provider}；删除表头前内容 {source.removed_leading_rows} 行；"
-        f"交易 {len(results)} 笔；需要人工确认 {pending} 笔。"
+    source_note = (
+        "解析 PDF 固定栏位"
+        if source.provider == "招商银行"
+        else f"删除表头前内容 {source.removed_leading_rows} 行"
     )
+    print(f"完成：{output_path}\n来源：{source.provider}；{source_note}；交易 {len(results)} 笔；需要人工确认 {pending} 笔。")
     return 0
 
 
