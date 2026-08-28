@@ -14,6 +14,7 @@ venv/
 *.xls
 *.csv
 *.tsv
+*.pdf
 outputs/
 
 # JavaScript / Node and local test artifacts
