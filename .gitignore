@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+env/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
 
 # Local secrets
 .env
@@ -16,15 +21,14 @@ venv/
 *.tsv
 *.pdf
 outputs/
+data/
+bills/
+tmp/
 
 # JavaScript / Node and local test artifacts
 *.mjs
 node_modules/
 test/
-
-# Local wrappers not included in the Python-only repository
-run.cmd
-run.ps1
 
 # Editors and operating systems
 .vscode/

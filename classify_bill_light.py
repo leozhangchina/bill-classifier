@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""微信、支付宝和招商银行账单轻量分类器：本地规则分类，无大模型、无交互确认。"""
+"""微信、支付宝、招商银行和中国银行账单轻量分类器。"""
 
 from __future__ import annotations
 
 import argparse
 import csv
+import getpass
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -30,7 +32,10 @@ except ImportError as exc:
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_CATEGORIES = SCRIPT_DIR / "categories.default.json"
 DEFAULT_OVERRIDES = SCRIPT_DIR / "merchant-overrides.json"
-APPENDED_HEADERS = ["最终分类", "是否需要人工确认"]
+OUTPUT_HEADERS = [
+    "交易时间", "交易类型", "金额", "交易对方", "交易说明",
+    "二级分类", "是否需要人工确认",
+]
 
 # 不同账单采用不同列名，这里统一为程序内部字段。
 HEADER_ALIASES = {
@@ -54,6 +59,13 @@ CMB_PDF_HEADERS = [
     "记账日期", "货币", "交易金额", "联机余额", "交易摘要",
     "对手信息", "客户摘要", "交易对方", "收/支",
 ]
+
+BOC_PDF_HEADERS = [
+    "交易时间", "币种", "交易金额", "账户余额", "交易类型", "支付方式",
+    "网点名称", "备注", "交易对方", "对方账号", "对方开户行", "收/支",
+]
+
+PDF_PASSWORD_ENV = "BILL_CLASSIFIER_PDF_PASSWORD"
 
 # 对两个样本中常见、但通用分类表尚未覆盖的表达做少量补充。
 # 用户仍可直接编辑 categories.default.json 的 keywords 动态扩充规则。
@@ -195,14 +207,75 @@ def cmb_counterparty(customer_summary: str, counter_info: str) -> str:
     return re.sub(r"\s+\d[\d*]*$", "", counter_info).strip()
 
 
-def read_cmb_pdf_rows(path: Path) -> list[list[Any]]:
+def pdf_password_error(exc: BaseException) -> bool:
+    """判断 pdfplumber 包装的异常是否由 PDF 打开密码错误引起。"""
+    current: BaseException | None = exc
+    visited: set[int] = set()
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        if current.__class__.__name__ == "PDFPasswordIncorrect":
+            return True
+        current = current.__context__ or current.__cause__
+    return False
+
+
+def open_pdf_document(path: Path, supplied_password: str | None) -> tuple[Any, str | None]:
+    """打开 PDF；密码只从参数、环境变量或终端隐藏输入中取得。"""
+    try:
+        import pdfplumber
+    except ImportError as exc:
+        raise ValueError("读取银行 PDF 需要 pdfplumber，请运行：python -m pip install pdfplumber") from exc
+
+    environment_password = os.environ.get(PDF_PASSWORD_ENV)
+    password = supplied_password if supplied_password is not None else environment_password
+    try:
+        return pdfplumber.open(path, password=password or ""), password
+    except Exception as exc:
+        if not pdf_password_error(exc):
+            raise ValueError(f"无法读取 PDF：{exc or exc.__class__.__name__}") from exc
+        if password is not None:
+            raise ValueError("PDF 打开密码不正确") from exc
+        if not sys.stdin.isatty():
+            raise ValueError(
+                f"PDF 已加密；请使用 --pdf-password、环境变量 {PDF_PASSWORD_ENV}，"
+                "或在终端运行后按提示输入密码"
+            ) from exc
+
+    entered = getpass.getpass(f"请输入 {path.name} 的 PDF 打开密码：")
+    if not entered:
+        raise ValueError("未输入 PDF 打开密码")
+    try:
+        return pdfplumber.open(path, password=entered), entered
+    except Exception as exc:
+        if pdf_password_error(exc):
+            raise ValueError("PDF 打开密码不正确") from exc
+        raise ValueError(f"无法读取 PDF：{exc or exc.__class__.__name__}") from exc
+
+
+def pdf_cell_text(value: Any) -> str:
+    text = "" if value is None else str(value)
+    text = re.sub(r"\s*\n\s*", "", text).strip()
+    return "" if re.fullmatch(r"-{5,}", text) else text
+
+
+def boc_counterparty(counterparty: str, remark: str, transaction_name: str) -> str:
+    """去掉常见支付渠道前缀，保留中国银行账单中的实际交易对方。"""
+    candidate = counterparty or remark or transaction_name
+    candidate = candidate.replace("（", "(").replace("）", ")").strip()
+    for prefix in ("支付宝-", "抖音支付-", "微信支付-", "财付通-"):
+        if candidate.startswith(prefix):
+            return candidate[len(prefix):].strip()
+    return candidate
+
+
+def read_cmb_pdf_rows(path: Path, pdf_password: str | None = None) -> list[list[Any]]:
     try:
         import pdfplumber
     except ImportError as exc:
         raise ValueError("读取招商银行 PDF 需要 pdfplumber，请运行：python -m pip install pdfplumber") from exc
 
     rows: list[list[Any]] = []
-    with pdfplumber.open(path) as pdf:
+    with pdfplumber.open(path, password=pdf_password or "") as pdf:
         first_text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
         if "招商银行交易流水" not in first_text:
             raise ValueError("目前仅支持带文字层的招商银行交易流水 PDF")
@@ -256,9 +329,75 @@ def read_cmb_pdf_rows(path: Path) -> list[list[Any]]:
     return rows
 
 
-def read_rows(path: Path, requested_sheet: str | None) -> tuple[list[list[Any]], str]:
+def read_boc_pdf_rows(path: Path, pdf_password: str | None = None) -> list[list[Any]]:
+    try:
+        import pdfplumber
+    except ImportError as exc:
+        raise ValueError("读取中国银行 PDF 需要 pdfplumber，请运行：python -m pip install pdfplumber") from exc
+
+    rows: list[list[Any]] = []
+    with pdfplumber.open(path, password=pdf_password or "") as pdf:
+        first_text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        if "中国银行交易流水明细清单" not in first_text:
+            raise ValueError("目前仅支持带文字层的中国银行交易流水明细清单 PDF")
+
+        for page in pdf.pages:
+            page_text = page.extract_text() or ""
+            expected_match = re.search(r"行数\s*[:：]\s*(\d+)", page_text)
+            expected_rows = int(expected_match.group(1)) if expected_match else None
+            page_rows: list[list[Any]] = []
+            for table in page.extract_tables():
+                if not table or not table[0] or pdf_cell_text(table[0][0]) != "记账日期":
+                    continue
+                for raw in table[1:]:
+                    cells = [pdf_cell_text(value) for value in (list(raw) + [None] * 12)[:12]]
+                    date_text, time_text = cells[0], cells[1]
+                    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_text):
+                        continue
+                    if not re.fullmatch(r"\d{2}:\d{2}:\d{2}", time_text):
+                        raise ValueError(f"中国银行 PDF 第 {page.page_number} 页存在无法识别的记账时间")
+
+                    currency, amount_text, balance_text = cells[2], cells[3], cells[4]
+                    transaction_name, channel, branch_name = cells[5], cells[6], cells[7]
+                    remark, counterparty, counter_account, counter_bank = cells[8], cells[9], cells[10], cells[11]
+                    signed_amount = parse_amount(amount_text)
+                    balance = parse_amount(balance_text)
+                    if not isinstance(signed_amount, (int, float)) or not isinstance(balance, (int, float)):
+                        raise ValueError(f"中国银行 PDF 第 {page.page_number} 页金额或余额无法识别")
+
+                    direction = "收入" if signed_amount > 0 else "支出" if signed_amount < 0 else "不计收支"
+                    page_rows.append([
+                        datetime.strptime(f"{date_text} {time_text}", "%Y-%m-%d %H:%M:%S"),
+                        currency, abs(signed_amount), balance, transaction_name, channel,
+                        branch_name, remark, boc_counterparty(counterparty, remark, transaction_name),
+                        counter_account, counter_bank, direction,
+                    ])
+
+            if expected_rows is not None and len(page_rows) != expected_rows:
+                raise ValueError(
+                    f"中国银行 PDF 第 {page.page_number} 页声明 {expected_rows} 笔，实际识别 {len(page_rows)} 笔"
+                )
+            rows.extend(page_rows)
+
+    if not rows:
+        raise ValueError("中国银行 PDF 中没有识别到交易记录")
+    return rows
+
+
+def read_rows(
+    path: Path,
+    requested_sheet: str | None,
+    pdf_password: str | None = None,
+) -> tuple[list[list[Any]], str]:
     if path.suffix.lower() == ".pdf":
-        return [CMB_PDF_HEADERS, *read_cmb_pdf_rows(path)], "交易流水"
+        pdf, resolved_password = open_pdf_document(path, pdf_password)
+        with pdf:
+            first_text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        if "招商银行交易流水" in first_text:
+            return [CMB_PDF_HEADERS, *read_cmb_pdf_rows(path, resolved_password)], "交易流水"
+        if "中国银行交易流水明细清单" in first_text:
+            return [BOC_PDF_HEADERS, *read_boc_pdf_rows(path, resolved_password)], "交易流水"
+        raise ValueError("目前仅支持招商银行或中国银行的带文字层交易流水 PDF")
 
     if path.suffix.lower() == ".xlsx":
         workbook = load_workbook(path, read_only=True, data_only=True)
@@ -289,7 +428,7 @@ def read_rows(path: Path, requested_sheet: str | None) -> tuple[list[list[Any]],
                 pass
         return [list(row) for row in csv.reader(text.splitlines(), delimiter=delimiter)], "账单"
 
-    raise ValueError("仅支持 .xlsx、.csv、.tsv 或招商银行交易流水 .pdf")
+    raise ValueError("仅支持 .xlsx、.csv、.tsv 或招商银行/中国银行交易流水 .pdf")
 
 
 def parse_datetime(value: Any) -> Any:
@@ -312,8 +451,12 @@ def parse_amount(value: Any) -> Any:
     return float(match.group(0)) if match else value
 
 
-def clean_source(path: Path, requested_sheet: str | None) -> SourceData:
-    raw_rows, sheet_name = read_rows(path, requested_sheet)
+def clean_source(
+    path: Path,
+    requested_sheet: str | None,
+    pdf_password: str | None = None,
+) -> SourceData:
+    raw_rows, sheet_name = read_rows(path, requested_sheet, pdf_password)
     header_index = find_header_row(raw_rows)
     header_values = list(raw_rows[header_index])
     while header_values and not normalize_text(header_values[-1]):
@@ -321,7 +464,8 @@ def clean_source(path: Path, requested_sheet: str | None) -> SourceData:
     headers = [str(value).strip() if normalize_text(value) else f"未命名列{index + 1}" for index, value in enumerate(header_values)]
     lookup = header_lookup(headers)
     provider = (
-        "招商银行" if path.suffix.lower() == ".pdf"
+        "中国银行" if path.suffix.lower() == ".pdf" and "对方开户行" in headers
+        else "招商银行" if path.suffix.lower() == ".pdf"
         else "支付宝" if "支付宝" in path.name or "交易分类" in headers
         else "微信"
     )
@@ -410,14 +554,44 @@ def transaction_from_row(row: list[Any], lookup: dict[str, int]) -> dict[str, An
     )}
 
 
+def display_text(value: Any) -> str:
+    text = "" if value is None else str(value)
+    cleaned = re.sub(r"\s+", " ", text.lstrip("`").replace("\u3000", " ")).strip()
+    return "" if re.fullmatch(r"[-/_.—－]+", cleaned) else cleaned
+
+
+def transaction_description(transaction: dict[str, Any]) -> str:
+    """保留对人工复核有用的商品/备注；原始交易类型仅在没有详情时兜底。"""
+    details: list[str] = []
+    for key in ("product", "remark"):
+        value = display_text(transaction.get(key))
+        if value and value not in details:
+            details.append(value)
+    if not details:
+        value = display_text(transaction.get("type"))
+        if value:
+            details.append(value)
+    return " / ".join(details)
+
+
 def transaction_text(transaction: dict[str, Any]) -> str:
     return normalize_text(" ".join(str(transaction.get(key) or "") for key in (
         "type", "counterparty", "account", "product", "direction", "status", "remark"
     )))
 
 
+def is_internal_change_transfer(transaction: dict[str, Any]) -> bool:
+    """微信零钱转入零钱通只是账户内划转，不产生收入或支出。"""
+    return (
+        normalize_text(transaction.get("type")).replace(" ", "") == "转入零钱通-来自零钱"
+        and normalize_text(transaction.get("direction")) in {"", "/", "不计收支"}
+    )
+
+
 def transaction_flow(transaction: dict[str, Any]) -> str:
-    """轻量版只区分收入和支出，不使用转账分类组。"""
+    """普通交易区分收支；明确的账户内划转记为不计收支。"""
+    if is_internal_change_transfer(transaction):
+        return "transfer"
     text = transaction_text(transaction)
     if "退款" in text or "退货" in text:
         return "income"
@@ -450,6 +624,8 @@ def transaction_flow(transaction: dict[str, Any]) -> str:
 def classify(transaction: dict[str, Any], config: Config, overrides: dict[str, str]) -> Result:
     text = transaction_text(transaction)
     flow = transaction_flow(transaction)
+    if flow == "transfer":
+        return Result(config.fallback_by_flow["transfer"], 0.995, "账户内划转")
     eligible = config.categories_for_flow(flow)
     allowed = config.labels_for_flow(flow)
 
@@ -520,11 +696,22 @@ def build_workbook(source: SourceData, results: list[Result], threshold: float) 
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "分类结果"
-    sheet.append([*source.headers, *APPENDED_HEADERS])
-    source_count = len(source.headers)
-    id_indexes = {source.lookup[key] for key in ("transaction_id", "merchant_id") if source.lookup[key] >= 0}
-    for source_row, result in zip(source.rows, results):
-        sheet.append([*source_row, result.category, "是" if result.confidence < threshold else "否"])
+    sheet.append(OUTPUT_HEADERS)
+    for row_number, (source_row, result) in enumerate(zip(source.rows, results), start=2):
+        transaction = transaction_from_row(source_row, source.lookup)
+        amount = parse_amount(transaction.get("amount"))
+        if not isinstance(amount, (int, float)):
+            raise ValueError(f"第 {row_number} 笔交易金额无法识别")
+        flow = transaction_flow(transaction)
+        sheet.append([
+            transaction.get("time"),
+            {"income": "收入", "expense": "支出", "transfer": "不计收支"}[flow],
+            abs(amount),
+            display_text(transaction.get("counterparty")),
+            transaction_description(transaction),
+            result.category,
+            "是" if result.confidence < threshold else "否",
+        ])
 
     header_fill = PatternFill("solid", fgColor="0F766E")
     header_font = Font(name="Microsoft YaHei", bold=True, color="FFFFFF")
@@ -540,45 +727,24 @@ def build_workbook(source: SourceData, results: list[Result], threshold: float) 
             cell.font = body_font
             cell.alignment = Alignment(vertical="center")
             cell.border = bottom_border
-        sheet.row_dimensions[row[0].row].height = 38 if source.provider == "招商银行" else 26
-    for index in id_indexes:
-        for row in range(2, sheet.max_row + 1):
-            sheet.cell(row, index + 1).number_format = "@"
-    if source.lookup["time"] >= 0:
-        for row in range(2, sheet.max_row + 1):
-            sheet.cell(row, source.lookup["time"] + 1).number_format = (
-                "yyyy-mm-dd" if source.provider == "招商银行" else "yyyy-mm-dd hh:mm:ss"
-            )
-    if source.lookup["amount"] >= 0:
-        for row in range(2, sheet.max_row + 1):
-            cell = sheet.cell(row, source.lookup["amount"] + 1)
-            cell.number_format = "#,##0.00"
-            cell.alignment = Alignment(horizontal="right", vertical="center")
-    if source.lookup["balance"] >= 0:
-        for row in range(2, sheet.max_row + 1):
-            cell = sheet.cell(row, source.lookup["balance"] + 1)
-            cell.number_format = "#,##0.00"
-            cell.alignment = Alignment(horizontal="right", vertical="center")
+        sheet.row_dimensions[row[0].row].height = 38
 
-    default_widths = {
-        "time": 16, "type": 16, "counterparty": 27, "account": 32, "product": 35,
-        "direction": 11, "amount": 12, "payment": 16, "status": 16,
-        "transaction_id": 34, "merchant_id": 34, "remark": 20, "balance": 14, "currency": 10,
-    }
-    for key, index in source.lookup.items():
-        if index >= 0:
-            sheet.column_dimensions[excel_column(index + 1)].width = default_widths.get(key, 16)
-    if source.provider == "招商银行":
-        for key in ("account", "product", "counterparty"):
-            index = source.lookup[key]
-            if index >= 0:
-                for row in range(2, sheet.max_row + 1):
-                    sheet.cell(row, index + 1).alignment = Alignment(vertical="center", wrap_text=True)
-    sheet.column_dimensions[excel_column(source_count + 1)].width = 18
-    sheet.column_dimensions[excel_column(source_count + 2)].width = 20
     for row in range(2, sheet.max_row + 1):
-        sheet.cell(row, source_count + 1).alignment = Alignment(horizontal="center", vertical="center")
-        sheet.cell(row, source_count + 2).alignment = Alignment(horizontal="center", vertical="center")
+        sheet.cell(row, 1).number_format = (
+            "yyyy-mm-dd" if source.provider == "招商银行" else "yyyy-mm-dd hh:mm:ss"
+        )
+        sheet.cell(row, 2).alignment = Alignment(horizontal="center", vertical="center")
+        sheet.cell(row, 3).number_format = "#,##0.00"
+        sheet.cell(row, 3).alignment = Alignment(horizontal="right", vertical="center")
+        for column in (4, 5):
+            sheet.cell(row, column).alignment = Alignment(vertical="center", wrap_text=True)
+        for column in (6, 7):
+            sheet.cell(row, column).alignment = Alignment(horizontal="center", vertical="center")
+
+    for column, width in {
+        "A": 22, "B": 11, "C": 13, "D": 30, "E": 40, "F": 18, "G": 20,
+    }.items():
+        sheet.column_dimensions[column].width = width
     sheet.freeze_panes = "A2"
     sheet.sheet_view.showGridLines = False
     table = Table(displayName="LightClassificationResults", ref=f"A1:{excel_column(sheet.max_column)}{sheet.max_row}")
@@ -596,26 +762,53 @@ def verify_output(path: Path, source: SourceData, labels: set[str]) -> None:
         if workbook.sheetnames != ["分类结果"]:
             raise RuntimeError("输出应且仅应包含“分类结果”工作表")
         sheet = workbook["分类结果"]
-        if sheet.max_row != len(source.rows) + 1 or sheet.max_column != len(source.headers) + 2:
+        if sheet.max_row != len(source.rows) + 1 or sheet.max_column != len(OUTPUT_HEADERS):
             raise RuntimeError("输出行列数与输入不一致")
-        if [sheet.cell(1, sheet.max_column - 1).value, sheet.cell(1, sheet.max_column).value] != APPENDED_HEADERS:
-            raise RuntimeError("输出分类列标题不正确")
+        if [sheet.cell(1, column).value for column in range(1, sheet.max_column + 1)] != OUTPUT_HEADERS:
+            raise RuntimeError("输出列标题或顺序不正确")
         for row in range(2, sheet.max_row + 1):
-            if sheet.cell(row, sheet.max_column - 1).value not in labels:
+            if sheet.cell(row, 2).value not in {"收入", "支出", "不计收支"}:
+                raise RuntimeError(f"第 {row} 行交易类型无效")
+            amount = sheet.cell(row, 3).value
+            if not isinstance(amount, (int, float)) or amount < 0:
+                raise RuntimeError(f"第 {row} 行金额不是非负数值")
+            if sheet.cell(row, 6).value not in labels:
                 raise RuntimeError(f"第 {row} 行分类不在清单中")
-            if sheet.cell(row, sheet.max_column).value not in {"是", "否"}:
+            if sheet.cell(row, 7).value not in {"是", "否"}:
                 raise RuntimeError(f"第 {row} 行人工确认标记错误")
     finally:
         workbook.close()
 
 
+def default_output_path(input_path: Path, source: SourceData) -> Path:
+    output_dir = input_path.parent / "outputs"
+    if source.provider == "中国银行" and source.lookup["time"] >= 0:
+        dates = [
+            row[source.lookup["time"]]
+            for row in source.rows
+            if isinstance(row[source.lookup["time"]], datetime)
+        ]
+        if dates:
+            start_date = min(dates).strftime("%Y%m%d")
+            end_date = max(dates).strftime("%Y%m%d")
+            return output_dir / f"中国银行交易流水({start_date}-{end_date})_已分类_轻量版.xlsx"
+    return output_dir / f"{input_path.stem}_已分类_轻量版.xlsx"
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="微信、支付宝和招商银行账单轻量分类器（无大模型、无交互）")
-    parser.add_argument("input", type=Path, help="微信 .xlsx、支付宝 .csv 或招商银行交易流水 .pdf 文件")
+    parser = argparse.ArgumentParser(description="微信、支付宝、招商银行和中国银行账单轻量分类器（无大模型）")
+    parser.add_argument(
+        "input", type=Path,
+        help="微信 .xlsx、支付宝 .csv 或招商银行/中国银行交易流水 .pdf 文件",
+    )
     parser.add_argument("--output", type=Path, help="输出 .xlsx 路径")
     parser.add_argument("--categories", type=Path, default=DEFAULT_CATEGORIES, help="分类配置 JSON")
     parser.add_argument("--overrides", type=Path, default=DEFAULT_OVERRIDES, help="商户覆盖规则 JSON")
     parser.add_argument("--sheet", help="指定 Excel 工作表")
+    parser.add_argument(
+        "--pdf-password",
+        help=f"PDF 打开密码；也可使用环境变量 {PDF_PASSWORD_ENV}，均不会写入输出文件",
+    )
     parser.add_argument("--threshold", type=float, default=0.82, help="需要人工确认的置信度阈值，默认 0.82")
     args = parser.parse_args()
     if not 0 <= args.threshold <= 1:
@@ -628,10 +821,14 @@ def main() -> int:
     input_path = args.input.resolve()
     if not input_path.is_file():
         raise FileNotFoundError(f"输入文件不存在：{input_path}")
-    output_path = (args.output or input_path.parent / "outputs" / f"{input_path.stem}_已分类_轻量版.xlsx").resolve()
     config = load_config(args.categories.resolve())
     overrides = load_overrides(args.overrides.resolve(), config)
-    source = clean_source(input_path, args.sheet)
+    source = clean_source(input_path, args.sheet, args.pdf_password)
+    output_path = (args.output or default_output_path(input_path, source)).resolve()
+    if output_path == input_path:
+        raise ValueError("输出路径不能与原始账单相同，请选择另一个 .xlsx 文件")
+    if output_path.suffix.lower() != ".xlsx":
+        raise ValueError("输出文件必须使用 .xlsx 扩展名")
     results = [classify(transaction_from_row(row, source.lookup), config, overrides) for row in source.rows]
     workbook = build_workbook(source, results, args.threshold)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -641,7 +838,7 @@ def main() -> int:
     pending = sum(result.confidence < args.threshold for result in results)
     source_note = (
         "解析 PDF 固定栏位"
-        if source.provider == "招商银行"
+        if source.provider in {"招商银行", "中国银行"}
         else f"删除表头前内容 {source.removed_leading_rows} 行"
     )
     print(f"完成：{output_path}\n来源：{source.provider}；{source_note}；交易 {len(results)} 笔；需要人工确认 {pending} 笔。")

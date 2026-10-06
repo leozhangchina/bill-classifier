@@ -35,8 +35,9 @@ except ImportError as exc:  # pragma: no cover - 方便用户获得明确安装�
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_CATEGORIES = SCRIPT_DIR / "categories.default.json"
-DEFAULT_OVERRIDES = SCRIPT_DIR / "merchant-overrides.json"
+PROJECT_DIR = SCRIPT_DIR.parent
+DEFAULT_CATEGORIES = PROJECT_DIR / "categories.default.json"
+DEFAULT_OVERRIDES = PROJECT_DIR / "merchant-overrides.json"
 
 APPENDED_HEADERS = ["最终分类", "是否大模型判断"]
 
